@@ -1,0 +1,294 @@
+package caterpillow.HypixelAPI;
+
+import caterpillow.Client.Client;
+import caterpillow.Notification.NotificationManager;
+import caterpillow.Notification.NotificationType;
+import java.io.IOException;
+import java.net.URL;
+import java.text.DecimalFormat;
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.IChatComponent;
+import optifine.json.ParseException;
+import org.apache.commons.io.IOUtils;
+import org.apache.http.ParseException;
+import org.json.JSONException;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
+
+public class BwStats implements Runnable {
+
+// very old and crappy code
+
+  private static String nameColor = "";
+  
+  private String player;
+  
+  public BwStats(String player) {
+    this.player = player;
+  }
+  
+  public static void statCheckBw(String player) throws ParseException, ParseException, JSONException {
+    NotificationManager.show(NotificationType.INFO, "Retrieving stats", "for " + player, 3);
+    String stats = playerBwStats(player);
+    if (stats.startsWith("ERROR")) {
+      NotificationManager.show(NotificationType.ERROR, "Bedwars Stat Error", stats, 3);
+    } else if (Client.instance.settingsManager.getSettingByName("Display").getValString().equalsIgnoreCase("Chat")) {
+      (Minecraft.getMinecraft()).thePlayer.addChatMessage((IChatComponent)new ChatComponentText(
+            String.valueOf(Client.instance.commandManager.client) + nameColor + player + " " + stats));
+    } else if (Client.instance.settingsManager.getSettingByName("Display").getValString()
+      .equalsIgnoreCase("Notif")) {
+      System.out.println("printing to chat");
+      NotificationManager.show(NotificationType.INFO, String.valueOf(nameColor) + player + "'s bw stats", 
+          "+ stats, 5);
+      nameColor = "";
+    } else if (Client.instance.settingsManager.getSettingByName("Display").getValString()
+      .equalsIgnoreCase("Send")) {
+      System.out.println("sending to msg sender");
+      Client.instance.msgSender.addMessage(String.valueOf(player) + ": " + stats);
+    } 
+  }
+  
+  public static String playerBwStats(String player) throws ParseException, ParseException, JSONException {
+    System.out.println("trying stat check");
+    Object object = null;
+    System.out.println("retrieving player data");
+    String playerInfo = player(player);
+    try {
+      if (playerInfo == "invalid player")
+        return "ERROR Invalid Player"; 
+      if (playerInfo == "Parse Exception / IO Exception")
+        return "ERROR Parse/IO Exception"; 
+      if (playerInfo == "missing api key")
+        return "ERROR no api key"; 
+      object = (new JSONParser()).parse(playerInfo);
+    } catch (ParseException e) {
+      return "ERROR ParseException";
+    } 
+    JSONObject obj = (JSONObject)object;
+    if (((Boolean)obj.get("success")).booleanValue()) {
+      JSONObject bedwars, achievements;
+      String packageRank, newPackageRank, monthlyRankColor, rank, prefix, str1, str2;
+      try {
+        JSONObject playerstats = (JSONObject)obj.get("player");
+        JSONObject stats = (JSONObject)playerstats.get("stats");
+        bedwars = (JSONObject)stats.get("Bedwars");
+        achievements = (JSONObject)playerstats.get("achievements");
+        packageRank = (String)playerstats.get("packageRank");
+        newPackageRank = (String)playerstats.get("newPackageRank");
+        String monthlyPackageRank = (String)playerstats.get("monthlyPackageRank");
+        monthlyRankColor = (String)playerstats.get("monthlyRankColor");
+        rank = (String)playerstats.get("rank");
+        prefix = (String)playerstats.get("prefix");
+      } catch (NullPointerException e) {
+        nameColor = "";
+        return "Hidden stats";
+      } 
+      if (prefix != null) {
+        nameColor = String.valueOf(prefix) + " ";
+      } else if (rank != null) {
+        String str;
+        switch ((str = rank).hashCode()) {
+          case 62130991:
+            if (!str.equals("ADMIN"))
+              break; 
+            nameColor = ";
+            break;
+          case 103295407:
+            if (!str.equals("YOUTUBER"))
+              break; 
+            nameColor = ";
+            break;
+          case 781890789:
+            if (!str.equals("MODERATOR"))
+              break; 
+            nameColor = ";
+            break;
+          case 2127365038:
+            if (!str.equals("HELPER"))
+              break; 
+            nameColor = ";
+            break;
+        } 
+      } else if (monthlyRankColor != null) {
+        nameColor = ";
+      } else if (newPackageRank != null) {
+        String str;
+        switch ((str = newPackageRank).hashCode()) {
+          case -1993348964:
+            if (!str.equals("VIP_PLUS"))
+              break; 
+            nameColor = ";
+            break;
+          case -1846126830:
+            if (!str.equals("MVP_PLUS"))
+              break; 
+            nameColor = ";
+            break;
+          case 76743:
+            if (!str.equals("MVP"))
+              break; 
+            nameColor = ";
+            break;
+          case 84989:
+            if (!str.equals("VIP"))
+              break; 
+            nameColor = ";
+            break;
+        } 
+      } else if (packageRank != null) {
+        String str;
+        switch ((str = packageRank).hashCode()) {
+          case -1993348964:
+            if (!str.equals("VIP_PLUS"))
+              break; 
+            nameColor = ";
+            break;
+          case -1846126830:
+            if (!str.equals("MVP_PLUS"))
+              break; 
+            nameColor = ";
+            break;
+          case 76743:
+            if (!str.equals("MVP"))
+              break; 
+            nameColor = ";
+            break;
+          case 84989:
+            if (!str.equals("VIP"))
+              break; 
+            nameColor = ";
+            break;
+        } 
+      } else {
+        nameColor = ";
+      } 
+      double fkdr = 0.0D;
+      long bwstars = 0L;
+      long ws = 0L;
+      try {
+        fkdr = ((Long)bedwars.get("final_kills_bedwars")).longValue() / ((Long)bedwars.get("final_deaths_bedwars")).longValue();
+        bwstars = 0L;
+        bwstars = ((Long)achievements.get("bedwars_level")).longValue();
+        ws = ((Long)bedwars.get("winstreak")).longValue();
+      } catch (Exception e) {
+        NotificationManager.show(NotificationType.ERROR, "Bwstat", "Hidden stats", 3);
+      } 
+      DecimalFormat df = new DecimalFormat("#.##");
+      String formattedFkdr = df.format(fkdr);
+      long l1 = ws;
+      long l2 = bwstars;
+      if (fkdr > 10.0D) {
+        formattedFkdr = "+ formattedFkdr + ";
+      } else if (fkdr > 9.0D) {
+        formattedFkdr = "+ formattedFkdr + ";
+      } else if (fkdr > 8.0D) {
+        formattedFkdr = "+ formattedFkdr + ";
+      } else if (fkdr > 7.0D) {
+        formattedFkdr = "+ formattedFkdr + ";
+      } else if (fkdr > 6.0D) {
+        formattedFkdr = "+ formattedFkdr + ";
+      } else if (fkdr > 5.0D) {
+        formattedFkdr = "+ formattedFkdr + ";
+      } else if (fkdr > 4.0D) {
+        formattedFkdr = "+ formattedFkdr + ";
+      } else if (fkdr > 3.0D) {
+        formattedFkdr = "+ formattedFkdr + ";
+      } else if (fkdr > 2.0D) {
+        formattedFkdr = "+ formattedFkdr + ";
+      } else if (fkdr > 1.0D) {
+        formattedFkdr = "+ formattedFkdr + ";
+      } else {
+        formattedFkdr = "+ formattedFkdr + ";
+      } 
+      if (bwstars > 1000L) {
+        str2 = "+ bwstars + ";
+      } else if (bwstars > 900L) {
+        str2 = "+ bwstars + ";
+      } else if (bwstars > 800L) {
+        str2 = "+ bwstars + ";
+      } else if (bwstars > 700L) {
+        str2 = "+ bwstars + ";
+      } else if (bwstars > 600L) {
+        str2 = "+ bwstars + ";
+      } else if (bwstars > 500L) {
+        str2 = "+ bwstars + ";
+      } else if (bwstars > 400L) {
+        str2 = "+ bwstars + ";
+      } else if (bwstars > 300L) {
+        str2 = "+ bwstars + ";
+      } else if (bwstars > 200L) {
+        str2 = "+ bwstars + ";
+      } else if (bwstars > 100L) {
+        str2 = "+ bwstars + ";
+      } 
+      if (ws > 30L) {
+        str1 = "+ ws + ";
+      } else if (ws > 15L) {
+        str1 = "+ ws + ";
+      } else if (ws > 5L) {
+        str1 = "+ ws + ";
+      } 
+      if (Client.instance.settingsManager.getSettingByName("Display").getValString().equalsIgnoreCase("Send"))
+        return String.valueOf(df.format(bwstars)) + "FKDR: " + df.format(fkdr) + " WS: " + df.format(ws); 
+      return String.valueOf(str2) + "FKDR: " + formattedFkdr + " WS: " + str1;
+    } 
+    return "ERROR " + obj.get("cause");
+  }
+  
+  public static String getUUID(String name) throws ParseException, JSONException, ParseException {
+    String url = "https://api.mojang.com/users/profiles/minecraft/" + name;
+    try {
+      String UUIDJson = IOUtils.toString(new URL(url));
+      if (UUIDJson.isEmpty()) {
+        (Minecraft.getMinecraft()).thePlayer
+          .addChatMessage((IChatComponent)new ChatComponentText("Player + name + " not exist!"));
+        return "invalid UUID";
+      } 
+      JSONObject UUIDObject = (JSONObject)JSONValue.parseWithException(UUIDJson);
+      return UUIDObject.get("id").toString();
+    } catch (IOException|ParseException e) {
+      e.printStackTrace();
+      return "Parse Exception / IOException";
+    } 
+  }
+  
+  public static String player(String player) throws ParseException, JSONException, ParseException {
+    String API_KEY = Client.instance.apiManager.getAPI();
+    if (API_KEY == null) {
+      NotificationManager.show(NotificationType.ERROR, "Missiing api key", "do /api new", 3);
+      return "missing api key";
+    } 
+    NotificationManager.show(NotificationType.INFO, "Retrieving UUID", "for " + player, 3);
+    String UUID = getUUID(player);
+    if (UUID == "invalid UUID")
+      return "invalid player"; 
+    if (UUID == "Parse Excepton / IO Exception")
+      return "Parse Exception / IO Exception"; 
+    try {
+      NotificationManager.show(NotificationType.INFO, "Accessing Hypixel API", "for " + player, 
+          3);
+      String url = "https://api.hypixel.net/player?uuid=" + UUID + "&" + "key=" + API_KEY;
+      String UUIDJson = IOUtils.toString(new URL(url));
+      JSONObject UUIDObject = (JSONObject)JSONValue.parseWithException(UUIDJson);
+      return UUIDObject.toString();
+    } catch (Exception e) {
+      e.printStackTrace();
+      return null;
+    } 
+  }
+  
+  public void run() {
+    try {
+      statCheckBw(this.player);
+    } catch (ParseException e) {
+      e.printStackTrace();
+    } catch (ParseException e) {
+      e.printStackTrace();
+    } catch (JSONException e) {
+      e.printStackTrace();
+    } 
+  }
+}
